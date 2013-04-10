@@ -1,3 +1,0 @@
-[submodule "public/amber"]
-	path = public/amber
-	url = git@github.com:amber-smalltalk/amber.git
