@@ -1,3 +1,6 @@
 [submodule "public/amber"]
 	path = public/amber
 	url = git@github.com:matthias-springer/tode-web-amber.git
+[submodule "tode"]
+	path = tode
+	url = git@github.com:dalehenrich/tode.git
