@@ -62,12 +62,31 @@ module GCI
       ffi_convention :stdcall
 
       attach_function "GciExecuteStr", [:string, :int], :int
+      attach_function "GciGetSessionId", [], :int
       attach_function "GciI64ToOop", [:int], :int
       attach_function "GciInit", [], :bool
       attach_function "GciLogin", [:string, :string], :bool
+      attach_function "GciLogout", [], :void
       attach_function "GciOopToI64", [:int], :int
       attach_function "GciSetNet", [:string, :string, :string, :string], :void
+      attach_function "GciSetSessionId", [:int], :void
+      attach_function "GciVersion", [], :int
     end  
+
+    def gci_get_session_id
+      #TODO: think about this
+
+      if @logged_in
+        return self.GciGetSessionId
+      else
+        return 0
+      end
+    end
+
+    def gci_logout
+      self.GciLogout if @logged_in
+      @logged_in = false
+    end
 
     def gci_login
       if not self.GciInit
@@ -81,8 +100,17 @@ module GCI
       end
 
       test_gci_link
+      @logged_in = true
     end
    
+    def gci_set_session_id(session_id)
+      self.GciSetSessionId(session_id)
+    end
+
+    def gci_version
+      self.GciVersion
+    end
+
     private
 
     def test_gci_link
