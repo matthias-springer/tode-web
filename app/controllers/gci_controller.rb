@@ -1,7 +1,7 @@
 class GciController < ApplicationController
   include ApplicationHelper
 
-  before_filter :update_session_id, :except => [:get_session_id, :init, :login]
+  before_filter :update_session_id, :except => [:get_session_id, :init, :login, :set_session_id]
 
   def get_session_id
     render :json => GCI.gci_get_session_id
@@ -17,9 +17,9 @@ class GciController < ApplicationController
     begin
       GCI.init_ffi
       
-      render :json => {"success" => true}
+      render :json => {"success" => true, "result" => nil}
     rescue Exception => e
-      render :json => {"success" => false}
+      render :json => {"success" => false, "exception" => e.to_s}
     end
   end
 
@@ -29,24 +29,41 @@ class GciController < ApplicationController
     end
 
     begin
-      GCI.gci_logout
+      #GCI.gci_logout
       GCI.gci_login
       session_id = GCI.gci_get_session_id
 
       # TODO: support multiple sessions
-      render :json => {"success" => true, "sessionId" => session_id}
+      render :json => {"success" => true, "sessionId" => session_id, "result" => session_id}
     rescue Exception => e
-      render :json => {"success" => false}
+      render :json => {"success" => false, "exception" => e.to_s}
     end
   end
 
-  def execute_string
-    log_gci "execute_string", params
-    GCI::GciExecuteStr(params[:string], params[:oop])
+  def execute_str
+    begin
+      log_gci "execute_str", params
+      result = GCI.gci_execute_str(params[:string], Integer(params[:oop]))
+
+      render :json => {"success" => true, "result" => result}
+    rescue Exception => e
+      render :json => {"success" => false, "exception" => e.to_s}
+    end
+  end
+
+  def fetch_str
+    begin
+      log_gci "fetch_str", params
+
+      result = GCI.gci_fetch_string(Integer(params[:oop]))
+      render :json => {"success" => true, "result" => result}
+    rescue Exception => e
+      render :json => {"success" => false, "exception" => e.to_s}
+    end
   end
 
   def version
-    render :json => GCI.gci_version
+    render :json => {"success" => true, "result" => GCI.gci_version}
   end
 
   private

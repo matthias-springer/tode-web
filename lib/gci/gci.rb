@@ -62,6 +62,8 @@ module GCI
       ffi_convention :stdcall
 
       attach_function "GciExecuteStr", [:string, :int], :int
+      attach_function "GciFetchChars_", [:int, :int, :string, :int], :int
+      attach_function "GciFetchSize_", [:int], :int
       attach_function "GciGetSessionId", [], :int
       attach_function "GciI64ToOop", [:int], :int
       attach_function "GciInit", [], :bool
@@ -72,6 +74,25 @@ module GCI
       attach_function "GciSetSessionId", [:int], :void
       attach_function "GciVersion", [], :int
     end  
+
+    def gci_execute_str(obj, oop)
+      return self.GciExecuteStr(obj, oop)
+    end
+
+    def gci_fetch_string(obj)
+      puts "getting size"
+      size = self.GciFetchSize_(obj) + 1
+      string_ptr = " " * size
+
+      puts "reading #{size} bytes"
+      size_read = self.GciFetchChars_(obj, 1, string_ptr, size)
+      if size_read + 1 == size
+        # strip null byte
+        return string_ptr[0..-2]
+      else
+        raise RuntimeError, "GciFetchChars() failed. Read #{size_read} instead of #{size} bytes."
+      end
+    end
 
     def gci_get_session_id
       #TODO: think about this
