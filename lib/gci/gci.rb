@@ -62,6 +62,7 @@ module GCI
       ffi_convention :stdcall
 
       attach_function "GciExecuteStr", [:string, :int], :int
+      attach_function "GciExecuteStr_", [:string, :int, :int], :int
       attach_function "GciFetchChars_", [:int, :int, :string, :int], :int
       attach_function "GciFetchSize_", [:int], :int
       attach_function "GciGetSessionId", [], :int
@@ -75,8 +76,12 @@ module GCI
       attach_function "GciVersion", [], :int
     end  
 
-    def gci_execute_str(obj, oop)
-      return self.GciExecuteStr(obj, oop)
+    def gci_execute_str(obj, oop, env_id = nil)
+      if env_id == nil
+        return self.GciExecuteStr(obj, oop)
+      else
+        return self.GciExecuteStr_(obj, oop, env_id)
+      end
     end
 
     def gci_fetch_string(obj)

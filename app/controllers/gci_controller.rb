@@ -43,10 +43,24 @@ class GciController < ApplicationController
   def execute_str
     begin
       log_gci "execute_str", params
-      result = GCI.gci_execute_str(params[:string], Integer(params[:oop]))
+      env_id = params[:envId] ? Integer(params[:envId]) : nil
+      result = GCI.gci_execute_str(params[:string], Integer(params[:oop]), env_id)
 
       render :json => {"success" => true, "result" => result}
     rescue Exception => e
+      render :json => {"success" => false, "exception" => e.to_s}
+    end
+  end
+
+  def execute_str_expecting_str
+    begin
+      log_gci "execute_str_expecting_str", params
+      env_id = params[:envId] ? Integer(params[:envId]) : nil
+      result_oop = GCI.gci_execute_str(params[:string], Integer(params[:oop]), env_id)
+      result = GCI.gci_fetch_string(result_oop)
+
+      render :json => {"success" => true, "result" => result}
+    rescue
       render :json => {"success" => false, "exception" => e.to_s}
     end
   end
