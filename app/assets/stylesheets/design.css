@@ -54,7 +54,7 @@
 ._jsPlumb_endpoint { z-index:5; }
 ._jsPlumb_overlay { z-index:6; }
 
-window-title {
+.window-title {
   padding: 3px;
   color: #ffffff;
   background-color: #080808;
