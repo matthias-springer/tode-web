@@ -61,8 +61,9 @@ module GCI
       ffi_lib gci_library_name
       ffi_convention :stdcall
 
+      attach_function "GciErr", [GciErrSType.ptr], :bool
       attach_function "GciExecuteStr", [:string, :int], :int
-      attach_function "GciExecuteStr_", [:string, :int, :int], :int
+      attach_function "GciExecuteStr_", [:string, :int, :int], :void
       attach_function "GciFetchChars_", [:int, :int, :string, :int], :int
       attach_function "GciFetchSize_", [:int], :int
       attach_function "GciGetSessionId", [], :int
@@ -70,7 +71,11 @@ module GCI
       attach_function "GciInit", [], :bool
       attach_function "GciLogin", [:string, :string], :bool
       attach_function "GciLogout", [], :void
+      attach_function "GciNbEnd", [:pointer], :int
+      attach_function "GciNbExecuteStr_", [:string, :int, :int], :int
+      attach_function "GciNewString", [:string], :int
       attach_function "GciOopToI64", [:int], :int
+      attach_function "GciPerform", [:int, :string, :pointer, :int], :int
       attach_function "GciSetNet", [:string, :string, :string, :string], :void
       attach_function "GciSetSessionId", [:int], :void
       attach_function "GciVersion", [], :int
@@ -97,6 +102,18 @@ module GCI
       else
         raise RuntimeError, "GciFetchChars() failed. Read #{size_read} instead of #{size} bytes."
       end
+    end
+    
+    def gci_long_to_oop(integer)
+      GCI.GciI64ToOop(integer)
+    end
+
+    def gci_nb_execute_string(string, oop, env_id)
+      GCI.GciNbExecuteStr_(string, oop, env_id)
+    end
+
+    def gci_new_string(string)
+      GCI.GciNewString(string)
     end
 
     def gci_get_session_id
@@ -128,6 +145,41 @@ module GCI
       test_gci_link
       @logged_in = true
     end
+    
+    def gci_nb_end
+      progress = nil
+      result = nil
+
+      FFI::MemoryPointer.new(:int, 1) do |ptr|
+        progress = self.GciNbEnd(ptr)
+        result = ptr.read_int if progress == 2
+      end
+
+      return [progress, result]
+    end
+
+    def poll_for_result
+      poll_result = [0, nil]
+
+      while (poll_result[0] != 2)
+        poll_result = gci_nb_end()
+        sleep 0.1 if poll_result[0] != 2
+      end
+
+      return poll_result[1]
+    end
+
+    def gci_perform(receiver, selector, arguments)
+      args = prepare_arguments(arguments)
+      result = nil
+
+      FFI::MemoryPointer.new(:int, args.length) do |p_args|
+        p_args.write_array_of_int(args)
+        result = self.GciPerform(receiver, selector, p_args, args.length)
+      end
+
+      return result
+    end
    
     def gci_set_session_id(session_id)
       self.GciSetSessionId(session_id)
@@ -137,8 +189,86 @@ module GCI
       self.GciVersion
     end
 
+    class GciErrSType < FFI::Struct
+      GCI_MAX_ERR_ARGS = 10
+      GCI_ERR_STR_SIZE = 1024
+      GCI_ERR_reasonSize = GCI_ERR_STR_SIZE
+
+      layout :category_x, :uint,
+        :category_y, :uint,
+        :context_x, :uint,
+        :context_y, :uint,
+        :exception_obj_x, :uint,
+        :exception_obj_y, :uint,
+        :args, [:uint, GCI_MAX_ERR_ARGS * 2],
+        :number, :int,
+        :arg_count, :int,
+        :fatal, :uchar,
+        :message, [:char, GCI_ERR_STR_SIZE + 1],
+        :reason, [:char, GCI_ERR_reasonSize + 1]
+    end
+
+    def gci_err
+      err_obj = GciErrSType.new
+      result = self.GciErr(err_obj)
+
+      args = []
+      (0..GciErrSType::GCI_MAX_ERR_ARGS-1).each do |arg_idx|
+        args[arg_idx] = oop_for_pointer(err_obj[:args][arg_idx*2], err_obj[:args][arg_idx*2 + 1])
+      end
+
+      return {:result => result,
+        :category => oop_for_pointer(err_obj[:category_x], err_obj[:category_y]),
+        :context => oop_for_pointer(err_obj[:category_x], err_obj[:category_y]),
+        :exception_obj => oop_for_pointer(err_obj[:exception_obj_x], err_obj[:exception_obj_y]),
+        :args => args,
+        :number => err_obj[:number],
+        :arg_count => err_obj[:arg_count],
+        :fatal => err_obj[:fatal],
+        :message => err_obj[:message].to_ptr.read_string,
+        :reason => err_obj[:message].to_ptr.read_string}
+    end
+
     private
 
+    def oop_for_pointer(x, y)
+      if y == 0
+        return x
+      else
+        return (y << 32) + x
+      end
+    end
+
+    def prepare_arguments(arguments)
+      puts "prepare_arguments #{arguments}"
+
+      args = []
+      (0..arguments.length - 1).each do |i|
+        args.push(arguments[i.to_s.to_sym])
+      end
+      
+      puts "args: #{args}"
+
+      args.collect do |arg|
+        type = arg["type"]
+        value = arg["value"]
+        puts "type: #{type}    value: #{value}"
+
+        case type
+          when "oop"
+            Integer(value)
+          when "string"
+            self.gci_new_string(value)
+          when "integer"
+            self.gci_long_to_oop(value)
+          when "float"
+            raise Exception, "float not supported yet"
+          else
+            raise Exception, "unknown data type #{type}"
+        end
+      end
+    end
+    
     def test_gci_link
       result = self.GciExecuteStr("1 + 2", OOP_NIL)
 
