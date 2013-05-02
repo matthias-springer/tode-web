@@ -40,6 +40,16 @@ class GciController < ApplicationController
     end
   end
 
+  def err
+    begin
+      err_result = GCI.gci_err
+      
+      render :json => {"success" => true, "result" => err_result}
+    rescue Exception => e
+      render :json => {"success" => false, "exception" => e.to_s}
+    end
+  end
+
   def execute_str
     begin
       log_gci "execute_str", params
@@ -74,6 +84,61 @@ class GciController < ApplicationController
     rescue Exception => e
       render :json => {"success" => false, "exception" => e.to_s}
     end
+  end
+
+  def long_to_oop
+    begin
+      log_gci "long_to_oop", params
+
+      result = GCI.gci_long_to_oop(Integer(params[:oop]))
+      render :json => {"success" => true, "result" => result}
+    rescue Exception => e
+      render :json => {"success" => false, "exception" => e.to_s}
+    end
+  end
+
+  def nb_execute_str
+    begin
+      log_gci "nb_execute_str", params
+
+      GCI.gci_nb_execute_string(params[:string], Integer(params[:oop]), Integer(params[:envId]))
+      render :json => {"success" => true, "result" => 0}
+    rescue Exception => e
+      render :json => {"success" => false, "exception" => e.to_s}
+    end
+  end
+
+  def new_string
+    begin
+      log_gci "new_string", params
+
+      result = GCI.gci_new_string(params[:string])
+      render :json => {"success" => true, "result" => result}
+    rescue Exception => e
+      render :json => {"success" => false, "exception" => e.to_s}
+    end
+  end
+
+  def perform
+    begin
+      log_gci "perform", params
+
+      result = GCI.gci_perform(Integer(params[:receiver]), params[:selector], params[:args])
+      render :json => {"success" => true, "result" => result}
+    rescue Exception => e
+      render :json => {"success" => false, "exception" => e.to_s}
+    end
+  end
+
+  def poll_for_result
+    begin
+      log_gci "poll_for_result", params
+      
+      result = GCI.poll_for_result
+      render :json => {"success" => true, "result" => result}
+    rescue Exception => e
+      render :json => {"success" => false, "exception" => e.to_s}
+    end 
   end
 
   def version
