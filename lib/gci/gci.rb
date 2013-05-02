@@ -63,7 +63,7 @@ module GCI
 
       attach_function "GciErr", [GciErrSType.ptr], :bool
       attach_function "GciExecuteStr", [:string, :int], :int
-      attach_function "GciExecuteStr_", [:string, :int, :int], :void
+      attach_function "GciExecuteStr_", [:string, :int, :int], :int
       attach_function "GciFetchChars_", [:int, :int, :string, :int], :int
       attach_function "GciFetchSize_", [:int], :int
       attach_function "GciGetSessionId", [], :int
@@ -71,7 +71,7 @@ module GCI
       attach_function "GciInit", [], :bool
       attach_function "GciLogin", [:string, :string], :bool
       attach_function "GciLogout", [], :void
-      attach_function "GciNbEnd", [:pointer], :int
+      attach_function "GciNbEnd", [GciOopPtrRefType.ptr], :int
       attach_function "GciNbExecuteStr_", [:string, :int, :int], :int
       attach_function "GciNewString", [:string], :int
       attach_function "GciOopToI64", [:int], :int
@@ -90,8 +90,9 @@ module GCI
     end
 
     def gci_fetch_string(obj)
-      puts "getting size"
+      puts "getting size for #{obj}"
       size = self.GciFetchSize_(obj) + 1
+      puts "size: #{size}"
       string_ptr = " " * size
 
       puts "reading #{size} bytes"
@@ -150,10 +151,9 @@ module GCI
       progress = nil
       result = nil
 
-      FFI::MemoryPointer.new(:int, 1) do |ptr|
-        progress = self.GciNbEnd(ptr)
-        result = ptr.read_int if progress == 2
-      end
+      ptr = GciOopPtrRefType.new
+      progress = self.GciNbEnd(ptr)
+      result = ptr.oop if progress == 2
 
       return [progress, result]
     end
@@ -189,17 +189,41 @@ module GCI
       self.GciVersion
     end
 
+    class GciOopRefType < FFI::Struct
+      layout :ptr_x, :int,
+        :ptr_y, :int
+
+      def oop
+        oop_for_pointer(self[:ptr_x], self[:ptr_y])
+      end
+
+      private
+
+      def oop_for_pointer(x, y)
+        if y == 0
+          return x
+        else
+          return (y << 32) + x
+        end
+      end
+    end
+
+    class GciOopPtrRefType < FFI::Struct
+      layout :ptr, GciOopRefType.ptr
+
+      def oop
+        self[:ptr].oop
+      end
+    end
+
     class GciErrSType < FFI::Struct
       GCI_MAX_ERR_ARGS = 10
       GCI_ERR_STR_SIZE = 1024
       GCI_ERR_reasonSize = GCI_ERR_STR_SIZE
 
-      layout :category_x, :uint,
-        :category_y, :uint,
-        :context_x, :uint,
-        :context_y, :uint,
-        :exception_obj_x, :uint,
-        :exception_obj_y, :uint,
+      layout :category, GciOopRefType,
+        :context, GciOopRefType,
+        :exception_obj, GciOopRefType,
         :args, [:uint, GCI_MAX_ERR_ARGS * 2],
         :number, :int,
         :arg_count, :int,
@@ -218,15 +242,15 @@ module GCI
       end
 
       return {:result => result,
-        :category => oop_for_pointer(err_obj[:category_x], err_obj[:category_y]),
-        :context => oop_for_pointer(err_obj[:category_x], err_obj[:category_y]),
-        :exception_obj => oop_for_pointer(err_obj[:exception_obj_x], err_obj[:exception_obj_y]),
+        :category => err_obj[:category].oop,
+        :context => err_obj[:context].oop,
+        :exceptionObj => err_obj[:exception_obj].oop,
         :args => args,
         :number => err_obj[:number],
-        :arg_count => err_obj[:arg_count],
+        :argCount => err_obj[:arg_count],
         :fatal => err_obj[:fatal],
         :message => err_obj[:message].to_ptr.read_string,
-        :reason => err_obj[:message].to_ptr.read_string}
+        :reason => err_obj[:reason].to_ptr.read_string}
     end
 
     private
